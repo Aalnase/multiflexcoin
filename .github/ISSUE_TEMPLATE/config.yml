@@ -1,0 +1,17 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security Policy
+    url: https://github.com/Aalnase/multiflexcoin/security/policy
+    about: Please report vulnerabilities via GitHub Security Advisories (see SECURITY.md).
+  - name: Documentation
+    url: https://github.com/Aalnase/multiflexcoin/tree/main/doc
+    about: Project documentation and build instructions.
+  - name: Website
+    url: https://multiflexcoin.com/
+    about: Project website.
+  - name: Telegram
+    url: https://t.me/multiflexcoin
+    about: Community channel on Telegram.
+  - name: General contact
+    url: mailto:hello@multiflexcoin.com
+    about: For non-security inquiries.

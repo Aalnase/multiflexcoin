@@ -1,0 +1,51 @@
+name: Bug report
+description: Submit a new bug report.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## This issue tracker is only for technical issues related to Multiflex Core.
+
+        * If you want to report a **security vulnerability**, please follow [SECURITY.md](../SECURITY.md) and use GitHub Security Advisories (do not open a public issue).
+        * For general questions/support, consider using GitHub Discussions (if enabled) or provide as much detail as possible here.
+
+        ----
+  - type: checkboxes
+    attributes:
+      label: Is there an existing issue for this?
+      description: Please search to see if an issue already exists for the bug you encountered.
+      options:
+        - label: I have searched the existing issues
+          required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Tell us what you expected to happen, and what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Tell us how to reproduce the bug.
+        Include:
+        - Run-time or compile-time configuration options
+        - Actions taken
+        - Environment (OS, CPU arch)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        Please copy and paste any relevant log output or attach a debug log file.
+
+        You can find the debug.log in your [data dir.](/doc/files.md#data-directory-location)
+
+        Please **remove any sensitive information** before posting publicly.
+    validations:
+      required: false

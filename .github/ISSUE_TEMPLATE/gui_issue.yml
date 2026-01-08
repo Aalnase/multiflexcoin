@@ -1,0 +1,25 @@
+name: GUI issue / feature request
+description: Any report, issue or feature request related to the GUI
+labels: [GUI]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the GUI issue/feature request.
+        Attach screenshots if they help (remove any sensitive information).
+
+  - type: textarea
+    id: gui-request
+    attributes:
+      label: Description
+      description: What is the GUI issue or what feature would you like?
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS / version, display scaling, and any other relevant environment information.
+    validations:
+      required: false
