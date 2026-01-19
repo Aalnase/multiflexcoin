@@ -9,11 +9,118 @@
 #include <chain.h>
 #include <primitives/block.h>
 #include <uint256.h>
+
+#include <algorithm>
 #include <util/check.h>
+
+
+namespace {
+// LWMA (Linearly Weighted Moving Average) difficulty adjustment.
+// - Uses the last N blocks (params.nPowLwmaAveragingWindow)
+// - More resistant to hash-rate swings and timestamp manipulation than very short retarget windows.
+// - Optional cap for difficulty increases per block (params.nPowLwmaMaxIncreaseBps).
+static unsigned int GetNextWorkRequiredLWMA(const CBlockIndex* pindexLast, const Consensus::Params& params)
+{
+    const int N = params.nPowLwmaAveragingWindow;
+    const int64_t T = params.nPowTargetSpacing;
+
+    // Safety: fall back to powLimit if misconfigured.
+    if (N <= 0 || T <= 0) {
+        return UintToArith256(params.powLimit).GetCompact();
+    }
+
+    // Need at least N blocks behind pindexLast.
+    if (pindexLast->nHeight < N) {
+        return UintToArith256(params.powLimit).GetCompact();
+    }
+
+    // k = sum(i) * T  for i=1..N  = N*(N+1)/2 * T
+    const int64_t k = (int64_t)N * (N + 1) * T / 2;
+
+    // LWMA uses weighted solve times and average target over the window.
+    int64_t lwma = 0;
+    arith_uint256 sum_target;
+    sum_target = 0;
+
+    const CBlockIndex* block = pindexLast;
+    for (int i = 1; i <= N; i++) {
+        const CBlockIndex* prev = block->pprev;
+        if (prev == nullptr) {
+            return UintToArith256(params.powLimit).GetCompact();
+        }
+
+        int64_t solvetime = block->GetBlockTime() - prev->GetBlockTime();
+
+        // Clamp solvetime to reduce the impact of extreme timestamps.
+        // We keep the LWMA v3 style lower bound (-T) but allow the
+        // upper bound to be configured via consensus.nPowLwmaMaxSolveTimeFactor.
+        // Larger factors let difficulty drop faster after long gaps.
+        const int64_t max_solvetime = (int64_t)params.nPowLwmaMaxSolveTimeFactor * T;
+        solvetime = std::min<int64_t>(max_solvetime, std::max<int64_t>(-T, solvetime));
+
+        lwma += solvetime * i;
+
+        arith_uint256 target;
+        target.SetCompact(block->nBits);
+        sum_target += target;
+
+        block = prev;
+    }
+
+    // Prevent extreme difficulty increases if timestamps go backwards.
+    // k/10 is a commonly used lower bound in LWMA implementations.
+    if (lwma < k / 10) {
+        lwma = k / 10;
+    }
+
+    arith_uint256 avg_target = sum_target / N;
+
+    arith_uint256 next_target = avg_target;
+    next_target *= (uint32_t)lwma;
+    next_target /= (uint32_t)k;
+
+    const arith_uint256 pow_limit = UintToArith256(params.powLimit);
+
+
+    // Optional: cap difficulty increases per block (i.e. cap target decreases).
+    // consensus.nPowLwmaMaxIncreaseBps is expressed in basis points (100 = 1%).
+    // This makes difficulty *ramp up* slowly (miner-friendly) while still allowing
+    // it to fall quickly when blocks are slow.
+    if (params.nPowLwmaMaxIncreaseBps > 0) {
+        arith_uint256 last_target;
+        last_target.SetCompact(pindexLast->nBits);
+
+        // Minimum allowed target = last_target / (1 + bps/10000)
+        // => min_target = last_target * 10000 / (10000 + bps)
+        arith_uint256 min_target = last_target;
+        min_target *= 10000;
+        min_target /= (uint32_t)(10000 + params.nPowLwmaMaxIncreaseBps);
+
+        if (next_target < min_target) {
+            next_target = min_target;
+        }
+    }
+
+    // Enforce pow limit (minimum difficulty).
+    if (next_target > pow_limit) {
+        next_target = pow_limit;
+    }
+
+    return next_target.GetCompact();
+}
+} // namespace
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     assert(pindexLast != nullptr);
+
+    // Switch to LWMA difficulty adjustment after activation height (hard-fork).
+    // Note: we use next block height (pindexLast->nHeight + 1) for activation checks.
+    const int next_height = pindexLast->nHeight + 1;
+    if (!params.fPowNoRetargeting && params.nPowLwmaStartHeight > 0 && next_height >= params.nPowLwmaStartHeight &&
+        params.nPowLwmaAveragingWindow > 0 && pindexLast->nHeight >= params.nPowLwmaAveragingWindow) {
+        return GetNextWorkRequiredLWMA(pindexLast, params);
+    }
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
     // Only change once per difficulty adjustment interval
