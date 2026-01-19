@@ -1,0 +1,137 @@
+name: CI (required)
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+
+concurrency:
+  group: ci-required-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-x86_64-daemon-cli:
+    name: Linux x86_64 (daemon+cli)
+    runs-on: ubuntu-latest
+    env:
+      HOST: x86_64-pc-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config python3 \
+            gperf bison flex automake libtool gettext \
+            curl ca-certificates git \
+            zip unzip
+
+      - name: Cache depends
+        uses: actions/cache@v4
+        with:
+          path: |
+            depends/built
+            depends/work
+            depends/sources
+            depends/${{ env.HOST }}
+          key: ${{ runner.os }}-depends-${{ env.HOST }}-${{ hashFiles('depends/packages/*.mk', 'depends/Makefile', 'depends/funcs.mk') }}
+          restore-keys: |
+            ${{ runner.os }}-depends-${{ env.HOST }}-
+
+      - name: Build depends (NO_QT=1)
+        run: |
+          make -C depends HOST=${HOST} NO_QT=1 -j$(nproc)
+
+      - name: Configure (CMake)
+        run: |
+          TOOLCHAIN="depends/${HOST}/toolchain.cmake"
+          test -f "$TOOLCHAIN" || (echo "Missing toolchain: $TOOLCHAIN" && exit 1)
+
+          rm -rf build-probe build
+          cmake -S . -B build-probe --toolchain "$TOOLCHAIN" -LH -Wno-dev > cmake_options.txt || true
+
+          EXTRA=""
+          grep -q '^ENABLE_GUI:' cmake_options.txt && EXTRA="$EXTRA -DENABLE_GUI=OFF"
+          grep -q '^BUILD_GUI:'  cmake_options.txt && EXTRA="$EXTRA -DBUILD_GUI=OFF"
+          grep -q '^ENABLE_IPC:' cmake_options.txt && EXTRA="$EXTRA -DENABLE_IPC=OFF"
+          grep -q '^WITH_ZMQ:'   cmake_options.txt && EXTRA="$EXTRA -DWITH_ZMQ=ON"
+
+          cmake -S . -B build --toolchain "$TOOLCHAIN" \
+            -DCMAKE_BUILD_TYPE=Release \
+            $EXTRA
+
+      - name: Build
+        run: |
+          cmake --build build --parallel $(nproc)
+
+      - name: Smoke stage (install)
+        run: |
+          rm -rf stage
+          cmake --install build --prefix "$PWD/stage" --strip
+          ls -la stage/bin || true
+
+  windows-x64-cross-daemon-cli:
+    name: Windows x64 cross (daemon+cli)
+    runs-on: ubuntu-latest
+    env:
+      HOST: x86_64-w64-mingw32
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config python3 \
+            gperf bison flex automake libtool gettext \
+            curl ca-certificates git \
+            zip unzip \
+            g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix mingw-w64
+
+      - name: Cache depends
+        uses: actions/cache@v4
+        with:
+          path: |
+            depends/built
+            depends/work
+            depends/sources
+            depends/${{ env.HOST }}
+          key: ${{ runner.os }}-depends-${{ env.HOST }}-${{ hashFiles('depends/packages/*.mk', 'depends/Makefile', 'depends/funcs.mk') }}
+          restore-keys: |
+            ${{ runner.os }}-depends-${{ env.HOST }}-
+
+      - name: Build depends (NO_QT=1)
+        run: |
+          make -C depends HOST=${HOST} NO_QT=1 -j$(nproc)
+
+      - name: Configure (CMake)
+        run: |
+          TOOLCHAIN="depends/${HOST}/toolchain.cmake"
+          test -f "$TOOLCHAIN" || (echo "Missing toolchain: $TOOLCHAIN" && exit 1)
+
+          rm -rf build-probe build-win
+          cmake -S . -B build-probe --toolchain "$TOOLCHAIN" -LH -Wno-dev > cmake_options.txt || true
+
+          EXTRA=""
+          grep -q '^ENABLE_GUI:' cmake_options.txt && EXTRA="$EXTRA -DENABLE_GUI=OFF"
+          grep -q '^BUILD_GUI:'  cmake_options.txt && EXTRA="$EXTRA -DBUILD_GUI=OFF"
+          grep -q '^ENABLE_IPC:' cmake_options.txt && EXTRA="$EXTRA -DENABLE_IPC=OFF"
+          grep -q '^WITH_ZMQ:'   cmake_options.txt && EXTRA="$EXTRA -DWITH_ZMQ=ON"
+
+          cmake -S . -B build-win --toolchain "$TOOLCHAIN" \
+            -DCMAKE_BUILD_TYPE=Release \
+            $EXTRA
+
+      - name: Build
+        run: |
+          cmake --build build-win --parallel $(nproc)
+
+      - name: Smoke stage (install)
+        run: |
+          rm -rf stage-win
+          cmake --install build-win --prefix "$PWD/stage-win" --strip
+          ls -la stage-win/bin || true

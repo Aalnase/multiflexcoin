@@ -124,6 +124,27 @@ struct Params {
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
+
+    /** LWMA (per-block) difficulty adjustment parameters.
+     *
+     * LWMA activates for blocks with height >= nPowLwmaStartHeight.
+     * The default is to keep LWMA disabled by setting nPowLwmaStartHeight to a very large value.
+     *
+     * nPowLwmaAveragingWindow:
+     *   N - number of blocks used for averaging (e.g. 60).
+     *
+     * nPowLwmaMaxSolveTimeFactor:
+     *   Upper clamp for per-block solvetime used in LWMA: solvetime is clamped to [-T, nPowLwmaMaxSolveTimeFactor*T].
+     *   Larger values => difficulty can drop faster after long block gaps.
+     *
+     * nPowLwmaMaxIncreaseBps:
+     *   Cap for difficulty increases per block, in basis points (100 = 1%). Set to 0 to disable.
+     */
+    int nPowLwmaStartHeight{std::numeric_limits<int>::max()};
+    int nPowLwmaAveragingWindow{0};
+    uint32_t nPowLwmaMaxSolveTimeFactor{6};
+    uint32_t nPowLwmaMaxIncreaseBps{0};
+
     std::chrono::seconds PowTargetSpacing() const
     {
         return std::chrono::seconds{nPowTargetSpacing};

@@ -27,9 +27,26 @@ target/
 
 /ci/scratch/
 
-# Editor backup files (avoid accidental commits)
-*~
+# --- Local build artifacts (do not commit) ---
+/build/
+/build-*/
+/build-win/
+/build-probe/
+/stage/
+/stage-*/
+/stage-win/
+/multiflex-*.zip
+/multiflex-*.tar.gz
+/SHA256SUMS
 
-# macOS / Windows cruft
-.DS_Store
-Thumbs.db
+# --- Local build artifacts (do not commit) ---
+/build/
+/build-*/
+/build-win/
+/build-probe/
+/stage/
+/stage-*/
+/stage-win/
+/multiflex-*.zip
+/multiflex-*.tar.gz
+/SHA256SUMS
