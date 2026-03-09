@@ -6,7 +6,7 @@ on:
       tag:
         description: "Existing tag to build & upload macOS assets for (e.g. v1.11.0rc1-mflex2)"
         required: true
-        default: "v1.11.0rc1-mflex2"
+        default: "v2.0.1"
 
 permissions:
   contents: write
